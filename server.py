@@ -96,6 +96,7 @@ class Complaint(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     rating: Optional[int] = None
     rating_comment: Optional[str] = None
+    entity_url: Optional[str] = None
 
 class ComplaintCreate(BaseModel):
     """Modelo para crear una nueva queja"""
@@ -180,13 +181,15 @@ async def classify_complaint_with_ai(title: str, description: str) -> dict:
         }
         
         categories = [
-            {"name": "Alumbrado Público", "entity": "Secretaría de Infraestructura"},
-            {"name": "Vías y Calles", "entity": "Secretaría de Infraestructura"},
-            {"name": "Recolección de Basuras", "entity": "Empresa de Servicios Públicos"},
-            {"name": "Agua Potable", "entity": "Empresa de Servicios Públicos"},
-            {"name": "Alcantarillado", "entity": "Empresa de Servicios Públicos"},
-            {"name": "Seguridad", "entity": "Secretaría de Gobierno"},
-            {"name": "Otros", "entity": "Alcaldía Municipal"}
+            {"name": "Alumbrado Público", "entity": "Secretaría de Infraestructura", "url": "https://www.buenaventura.gov.co/articulos/contactenos"},
+            {"name": "Vías y Calles", "entity": "Secretaría de Tránsito y Transporte", "url": "https://www.sttdbuenaventura.gov.co/contacto/"},
+            {"name": "Recolección de Basuras", "entity": "Establecimiento Público Ambiental (EPA)", "url": "https://www.epabuenaventura.gov.co/"},
+            {"name": "Agua Potable", "entity": "Alcaldía Municipal", "url": "https://www.buenaventura.gov.co/articulos/contactenos"},
+            {"name": "Alcantarillado", "entity": "Alcaldía Municipal", "url": "https://www.buenaventura.gov.co/articulos/contactenos"},
+            {"name": "Seguridad", "entity": "Policía Nacional - Estación Buenaventura", "url": "https://www.policia.gov.co/contenido/distrito-especial-buenaventura"},
+            {"name": "Educación", "entity": "Secretaría de Educación", "url": "https://www.sembuenaventura.gov.co/"},
+            {"name": "Salud", "entity": "Buenaventura Salud", "url": "https://buenaventurasalud.com/"},
+            {"name": "Otros", "entity": "Alcaldía Municipal", "url": "https://www.buenaventura.gov.co/articulos/contactenos"}
         ]
         
         categories_text = "\n".join([f"- {cat['name']}: {cat['entity']}" for cat in categories])
@@ -223,9 +226,19 @@ Responde ÚNICAMENTE en formato JSON:
                 import json
                 try:
                     classification = json.loads(content)
+                    category = classification.get("category", "Otros")
+                    entity = classification.get("entity", "Alcaldía Municipal")
+                    
+                    entity_url = "https://www.buenaventura.gov.co/articulos/contactenos"
+                    for cat in categories:
+                        if cat["entity"] == entity:
+                            entity_url = cat["url"]
+                            break
+                    
                     return {
-                        "category": classification.get("category", "Otros"),
-                        "entity": classification.get("entity", "Alcaldía Municipal")
+                        "category": category,
+                        "entity": entity,
+                        "url": entity_url
                     }
                 except json.JSONDecodeError:
                     pass
@@ -241,19 +254,59 @@ def classify_complaint_basic(text: str) -> dict:
     text_lower = text.lower()
     
     if any(word in text_lower for word in ["luz", "alumbrado", "poste", "luminaria", "lámpara"]):
-        return {"category": "Alumbrado Público", "entity": "Secretaría de Infraestructura"}
+        return {
+            "category": "Alumbrado Público", 
+            "entity": "Secretaría de Infraestructura",
+            "url": "https://www.buenaventura.gov.co/articulos/contactenos"
+        }
     elif any(word in text_lower for word in ["hueco", "vía", "calle", "carrera", "pavimento", "asfalto"]):
-        return {"category": "Vías y Calles", "entity": "Secretaría de Infraestructura"}
+        return {
+            "category": "Vías y Calles", 
+            "entity": "Secretaría de Tránsito y Transporte",
+            "url": "https://www.sttdbuenaventura.gov.co/contacto/"
+        }
     elif any(word in text_lower for word in ["basura", "residuos", "recolección", "desechos", "limpieza"]):
-        return {"category": "Recolección de Basuras", "entity": "Empresa de Servicios Públicos"}
+        return {
+            "category": "Recolección de Basuras", 
+            "entity": "Establecimiento Público Ambiental (EPA)",
+            "url": "https://www.epabuenaventura.gov.co/"
+        }
     elif any(word in text_lower for word in ["agua", "acueducto", "tubería", "fuga"]):
-        return {"category": "Agua Potable", "entity": "Empresa de Servicios Públicos"}
+        return {
+            "category": "Agua Potable", 
+            "entity": "Alcaldía Municipal",
+            "url": "https://www.buenaventura.gov.co/articulos/contactenos"
+        }
     elif any(word in text_lower for word in ["alcantarillado", "desagüe", "cloaca", "aguas negras"]):
-        return {"category": "Alcantarillado", "entity": "Empresa de Servicios Públicos"}
+        return {
+            "category": "Alcantarillado", 
+            "entity": "Alcaldía Municipal",
+            "url": "https://www.buenaventura.gov.co/articulos/contactenos"
+        }
     elif any(word in text_lower for word in ["seguridad", "robo", "delincuencia", "violencia", "inseguridad"]):
-        return {"category": "Seguridad", "entity": "Secretaría de Gobierno"}
+        return {
+            "category": "Seguridad", 
+            "entity": "Policía Nacional - Estación Buenaventura",
+            "url": "https://www.policia.gov.co/contenido/distrito-especial-buenaventura"
+        }
+    elif any(word in text_lower for word in ["educación", "escuela", "colegio", "estudiante"]):
+        return {
+            "category": "Educación", 
+            "entity": "Secretaría de Educación",
+            "url": "https://www.sembuenaventura.gov.co/"
+        }
+    elif any(word in text_lower for word in ["salud", "hospital", "médico", "enfermedad"]):
+        return {
+            "category": "Salud", 
+            "entity": "Buenaventura Salud",
+            "url": "https://buenaventurasalud.com/"
+        }
     else:
-        return {"category": "Otros", "entity": "Alcaldía Municipal"}
+        return {
+            "category": "Otros", 
+            "entity": "Alcaldía Municipal",
+            "url": "https://www.buenaventura.gov.co/articulos/contactenos"
+        }
 
 # === RUTAS DE AUTENTICACIÓN ===
 @api_router.post("/auth/register", response_model=Token)
@@ -335,7 +388,8 @@ async def create_complaint(complaint_create: ComplaintCreate, current_user: User
         "user_id": current_user.id,
         "user_email": current_user.email,
         "category_name": classification["category"],
-        "responsible_entity": classification["entity"]
+        "responsible_entity": classification["entity"],
+        "entity_url": classification.get("url", "https://www.buenaventura.gov.co/articulos/contactenos")
     })
     
     complaint = Complaint(**complaint_dict)
@@ -432,6 +486,30 @@ async def get_complaint_stats():
         by_category=category_counts,
         average_rating=avg_rating
     )
+
+@api_router.get("/complaints/stats/entities")
+async def get_entity_stats():
+    """Obtener estadísticas de quejas por entidad"""
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$responsible_entity",
+                "count": {"$sum": 1}
+            }
+        },
+        {
+            "$sort": {"count": -1}
+        }
+    ]
+    
+    result = await db.complaints.aggregate(pipeline).to_list(100)
+    
+    entity_stats = {}
+    for item in result:
+        if item["_id"]:  # Skip null entities
+            entity_stats[item["_id"]] = item["count"]
+    
+    return entity_stats
 
 # Incluir el router en la aplicación principal
 app.include_router(api_router)
