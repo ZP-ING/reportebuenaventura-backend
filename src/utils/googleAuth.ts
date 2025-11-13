@@ -1,4 +1,3 @@
-// Google OAuth usando Supabase Authentication
 import { supabase } from './supabase/client';
 
 interface GoogleUser {
@@ -9,17 +8,15 @@ interface GoogleUser {
 }
 
 /**
- * Inicia sesión con Google usando Supabase OAuth
- * Esta función redirige al usuario a Google para completar la autenticación
+ * Inicia sesión con Google (Supabase OAuth)
  */
 export async function signInWithGoogle(): Promise<void> {
   try {
-    // Usar Supabase para autenticación con Google
-    // Esto redirigirá automáticamente al usuario a Google
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        // 🔧 Usa redirectTo explícito
+        redirectTo: `${window.location.origin}`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -27,12 +24,7 @@ export async function signInWithGoogle(): Promise<void> {
       },
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    // La función termina aquí, el usuario será redirigido a Google
-    // Cuando vuelva, checkGoogleAuthSession() detectará la sesión
+    if (error) throw new Error(error.message);
   } catch (error) {
     console.error('Error en signInWithGoogle:', error);
     throw error;
@@ -40,16 +32,12 @@ export async function signInWithGoogle(): Promise<void> {
 }
 
 /**
- * Verifica si hay una sesión activa después de la redirección de OAuth
- * @returns Promise con la información del usuario o null
+ * Verifica si hay sesión activa después de la redirección
  */
 export async function checkGoogleAuthSession(): Promise<GoogleUser | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session || !session.user) {
-      return null;
-    }
+    if (!session?.user) return null;
 
     const user = session.user;
 
@@ -66,7 +54,7 @@ export async function checkGoogleAuthSession(): Promise<GoogleUser | null> {
 }
 
 /**
- * Cierra la sesión de Google
+ * Cierra la sesión
  */
 export async function signOutGoogle(): Promise<void> {
   try {
@@ -78,8 +66,7 @@ export async function signOutGoogle(): Promise<void> {
 }
 
 /**
- * Escucha cambios en el estado de autenticación
- * @param callback Función que se ejecuta cuando cambia el estado
+ * Escucha cambios de sesión
  */
 export function onAuthStateChange(
   callback: (user: GoogleUser | null) => void
@@ -100,8 +87,8 @@ export function onAuthStateChange(
     }
   );
 
-  // Retornar función para cancelar la suscripción
   return () => {
     subscription.unsubscribe();
   };
 }
+
